@@ -17,48 +17,51 @@ use std::{
         stdin, 
         Stdin,
         Read,
-        BufReader,
-        BufRead,
-        Result,
-        Lines
+        BufReader
     },
     process::exit,
     env,
-    fs::File,
-    path::Path
+    fs::File
 };
+
+struct Row  {
+    size: i32,
+    content: String,
+}
 
 struct Editor {
     cx: u16,
     cy: u16,
-    scrollstate: u16,
+  //  numrows: int,
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+    let file =  File::open(&args[1]).expect("FileOpenError");
+    let mut reader = BufReader::new(file);
+    let mut buffer: Vec<u8> = [].to_vec();
     let mut stdout = stdout().into_raw_mode().unwrap();
     let mut stdin = stdin();
-    let mut editor = Editor { cx: 1, cy: 1, scrollstate: 0 };
-    let mut buffer = read_lines(&args[1]).expect("FileReadError").flatten();
-
+    for byte in reader.bytes() {
+        buffer.push(byte.expect("YourByteIsWorseThanYourBarkError"));
+    }
+    let mut editor = Editor { cx: 1, cy: 1 };
     write!(stdout, "{}", clear::All).expect("RawModeError");
-
-
     loop {
-        for line in &mut buffer {
-            print!("{}\r\n", line);
-        }
         render(&mut stdout, &editor);
+        for byte in &buffer {
+            write!(stdout, "{}", *byte as char);
+            if *byte == 15 | 12 {
 
+            }
+        }
         let keyin = getkeypress(&mut stdin);
         processkeypress(&mut editor, keyin);
-
         if keyin == 17 { 
             write!(stdout, "{}", cursor::Show).expect("CursorRestoreError"); 
             stdout.suspend_raw_mode().expect("SuspendRawModeError"); 
             exit(0);
         }
-
     }
 }
 
@@ -100,7 +103,7 @@ fn rightpad(mut str: String, chr: String) -> String {
     return str
 }
 
-fn processkeypress(editor: &mut Editor, key: u8) {
+fn processkeypress(editor: &mut Editor, key: u8, ) {
     match key {
         b'h' => editor.cx = editor.cx - 1,
         b'j' => editor.cy = editor.cy + 1,
@@ -112,10 +115,4 @@ fn processkeypress(editor: &mut Editor, key: u8) {
     if editor.cy < 1 { editor.cy = 1 };
     if editor.cx > getborders().0 { editor.cx = getborders().0 };
     if editor.cy > getborders().1 { editor.cy = getborders().1 };
-}
-
-fn read_lines<P>(filename: P) -> Result<Lines<BufReader<File>>>
-where P: AsRef<Path>, {
-    let file = File::open(filename)?;
-    Ok(BufReader::new(file).lines())
 }
