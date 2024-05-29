@@ -31,23 +31,25 @@ use std::{
 struct Editor {
     cx: u16,
     cy: u16,
+    buffer: Vec<String>,
     scrollstate: u16,
+    vertlimit: u16,
 }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
     let mut stdout = stdout().into_raw_mode().unwrap();
     let mut stdin = stdin();
-    let mut editor = Editor { cx: 1, cy: 1, scrollstate: 0 };
-    let mut buffer = read_lines(&args[1]).expect("FileReadError").flatten();
-
+    let file = read_lines(&args[1]).expect("FileReadError").flatten();
+    let mut buffer: Vec<String> = Vec::new();
+    for line in file { buffer.push(line); }
+    let mut editor = Editor { cx: 1, cy: 1, scrollstate: 0, vertlimit: (getborders().1 - 1), buffer: buffer };
     write!(stdout, "{}", clear::All).expect("RawModeError");
 
 
     loop {
-        for line in &mut buffer {
-            print!("{}\r\n", line);
-        }
+        print!("{}{}", clear::All, cursor::Goto(1, 1));
+        drawlines(&mut editor, &mut stdout);
         render(&mut stdout, &editor);
 
         let keyin = getkeypress(&mut stdin);
@@ -80,6 +82,19 @@ fn render(stdout: &mut RawTerminal<Stdout>, editor: &Editor) {
     update(stdout);
 }
 
+fn drawlines(editor: &mut Editor, stdout: &mut RawTerminal<Stdout>) {
+    for i in editor.scrollstate.into()..editor.buffer.len() {
+        if i == (editor.vertlimit + editor.scrollstate).into() {
+            break;
+        } 
+        if editor.buffer[i] == "\0" {
+            break;
+        }
+
+        write!(stdout, "{}\r\n", editor.buffer[i]).expect("BufferReadError");
+    }
+}
+
 fn getborders() -> (u16, u16) {
     termion::terminal_size().unwrap()
 }
@@ -108,10 +123,10 @@ fn processkeypress(editor: &mut Editor, key: u8) {
         b'l' => editor.cx = editor.cx + 1,
         _ => {}
     }
-    if editor.cx < 1 { editor.cx = 1 };
-    if editor.cy < 1 { editor.cy = 1 };
+    if editor.cx < 1 { editor.cx = 1; };
+    if editor.cy < 1 { editor.cy = 1; if editor.scrollstate != 0 { editor.scrollstate -= 1 }};
     if editor.cx > getborders().0 { editor.cx = getborders().0 };
-    if editor.cy > getborders().1 { editor.cy = getborders().1 };
+    if editor.cy > getborders().1 - 2 { editor.cy = getborders().1 - 2; if editor.scrollstate.into() < editor.buffer.len() { editor.scrollstate += 1; }};
 }
 
 fn read_lines<P>(filename: P) -> Result<Lines<BufReader<File>>>
