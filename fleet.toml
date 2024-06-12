@@ -1,5 +1,0 @@
-rd_enabled = true
-fleet_id = "9e2647e0-e36f-4a36-817b-6289fdafb0ac"
-
-[build]
-sccache = "/home/noah/.cargo/bin/sccache"
